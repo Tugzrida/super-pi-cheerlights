@@ -1,0 +1,11 @@
+[Unit]
+Description=super-pi-cheerlights
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/pi/super-pi-cheerlights/super-pi-cheerlights.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

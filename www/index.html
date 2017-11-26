@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Super Pi CheerLights</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="/static/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/bootstrap-slider/bootstrap-slider.min.css">
+    <link rel="stylesheet" href="/static/spectrum/spectrum.css">
+    <script src="/static/jquery.min.js"></script>
+    <script src="/static/bootstrap/bootstrap.min.js"></script>
+    <script src="/static/bootstrap-slider/bootstrap-slider.min.js"></script>
+    <script src="/static/spectrum/spectrum.js"></script>
+    <script>
+        /////////////////////////////////////
+        // Settings specific to each setup //
+        /////////////////////////////////////
+        // See further settings in getsun.py(location, timezone, off time and manual overrides) and super-pi-cheerlights.py(Builtin server, white balance and colour definitions)
+
+        // Show cheerlights controls
+        var show_cheerlights = true; //true or false
+
+        // Show fairy lights controls
+        var show_fairylights = true; //true or false
+        /////////////////////////////////////
+
+    </script>
+    <style>
+        body {
+            /* Make background colour fade */
+            transition: background-color 3s;
+        }
+        
+        body::after {
+            /* Add fairy lights gif to background, with opacity 0 */
+            transition: opacity 3s;
+            content: "";
+            background: url(/static/lights.gif);
+            opacity: 0;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            position: absolute;
+            z-index: -1;
+        }
+        
+        body.flon::after {
+            /* Make gif opacity 1 if body has class flon */
+            opacity: 1;
+        }
+        
+        #tapePicker+div {
+            /* Hide colour picker by default */
+            display: none;
+        }
+        
+        .container {
+            /* Center container */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translateY(-50%) translateX(-50%);
+            width: 60%;
+        }
+        
+        .jumbotron {
+            /* Set colour for control panel */
+            background-color: rgba(238, 238, 238, 0.7);
+            text-align: center;
+        }
+        
+        .sp-cancel {
+            /* Hide redundant cancel button of colour picker */
+            display: none;
+        }
+        
+        .tick-slider-selection {
+            /* Tidy up sliders */
+            background-image: none !important;
+        }
+        
+        .slider-tick {
+            /* Tidy up sliders */
+            background-image: linear-gradient(to bottom, #f9f9f9 0, #f5f5f5 100%) !important;
+            opacity: 1 !important;
+        }
+        
+        #controls .modal-body {
+            /* Center extra controls */
+            text-align: center;
+        }
+
+    </style>
+</head>
+
+<body>
+    <!-- Extra controls modal -->
+    <div class="modal fade" id="controls" tabindex="-1" role="dialog" style="top: 50%; transform: translateY(-50%);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title">Extra controls!</h4>
+                </div>
+                <div class="modal-body">
+                    <button class="btn btn-success" data-load="/do/reloadsun">Reload sunset times from API</button>
+                    <button class="btn btn-danger" data-load="/do/shutdown">Shutdown Pi</button>
+                    <script>
+                        // Load API endpoint when button clicked
+                        $('[data-load]').click(function() {
+                            $.get($(this).attr('data-load'));
+                        });
+
+                    </script>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main control panel -->
+    <div class="container">
+        <div class="jumbotron">
+            <h2>Super Pi CheerLights <span id="opencontrols">Control</span></h2>
+            <div class="row">
+                <div class="col-md-6" id="cheerlightscontrols">
+                    <h4>LED Tape</h4>
+                    <input type="text" id="tapeSlider">
+                    <br>
+                    <br>
+                    <input type="text" id="tapePicker">
+                    <br>
+                </div>
+                <div class="col-md-6" id="fairycontrols">
+                    <h4>Fairy lights</h4>
+                    <input type="text" id="fairySlider">
+                    <br>
+                    <br>
+                    <input type="text" id="fairyStateSlider">
+                </div>
+            </div>
+            Available on <a href="https://github.com/Tugzrida/super-pi-cheerlights" target="_blank">GitHub</a>&nbsp;&nbsp;<iframe style="vertical-align:middle" src="https://ghbtns.com/github-btn.html?user=Tugzrida&repo=super-pi-cheerlights&type=star&count=true" frameborder="0" scrolling="0" width="170px" height="20px"></iframe>
+        </div>
+    </div>
+
+    <script>
+        if (!show_cheerlights) {
+            // Hide cheerlights controls and center fairy lights controls if option set
+            $("#cheerlightscontrols").css("display", "none");
+            $("#fairycontrols").css("left", "50%");
+            $("#fairycontrols").css("transform", "translateX(-50%)");
+        }
+
+        if (!show_fairylights) {
+            // Hide fairy lights controls and center cheerlights controls if option set
+            $("#fairycontrols").css("display", "none");
+            $("#cheerlightscontrols").css("left", "50%");
+            $("#cheerlightscontrols").css("transform", "translateX(-50%)");
+        }
+
+        // These variables are used to ensure the colour of the colour picker won't change if the user has changed it manually.
+        // This is only important for when multiple users are using the UI at once
+        var oldr, oldg, oldb;
+        oldr = oldg = oldb = 0;
+        
+        // Variable to keep track of the interval of the load() function
+        var loadinterval;
+        
+        // Start interval of load() function. The interval is stopped when any change is sent and then restarted
+        // to allow the server to catch up and prevent changes backwards and forwards between the previous and new states
+        function startLoad() {
+            loadinterval = setInterval(function() {
+                load();
+            }, 7000);
+        }
+        
+        // Stop interval of load() function
+        function stopLoad() {
+            clearInterval(loadinterval);
+        }
+
+        // This is necessary as the Pi's PWM duty cycle can be set from 0-100, however 8-bit RGB is 0-255
+        function map(a, b, c, d, e) {
+            return parseInt(d + (e - d) * ((a - b) / (c - b)))
+        };
+
+        // Set manual colour from colour picker
+        $("#tapePicker").spectrum({
+            flat: true,
+            clickoutFiresChange: false,
+            change: function(colour) {
+            	stopLoad();
+                $.get("/do/set/tapeColour/" + map(colour.toRgb().r, 0, 255, 0, 100) + "/" + map(colour.toRgb().g, 0, 255, 0, 100) + "/" + map(colour.toRgb().b, 0, 255, 0, 100));
+            	$('body').css("background-color", "rgb(" + colour.toRgb().r + "," + colour.toRgb().g + "," + colour.toRgb().b + ")");
+            	// Save colour for next run
+            	oldr = colour.toRgb().r;
+            	oldg = colour.toRgb().g;
+            	oldb = colour.toRgb().b;
+            	startLoad();
+            }
+        });
+
+        // Handle tapeMode toggle element
+        var tapeSlider = $('#tapeSlider')
+            .slider({
+                min: 1,
+                max: 3,
+                ticks: [1, 2, 3],
+                ticks_labels: ["Timer CheerLights", "CheerLights", "Manual"],
+                step: 1,
+                tooltip: "hide"
+            })
+            .on("change", function(e) {
+            	stopLoad();
+                $.get("/do/set/tapeMode/" + (e.value.newValue - 1));
+                if (e.value.newValue == 3) {
+                    $("#tapePicker+div").css("display", "inline-block");
+                } else {
+                    $("#tapePicker+div").css("display", "none");
+                }
+                startLoad();
+            });
+
+        // Handle fairyMode toggle element
+        var fairySlider = $('#fairySlider')
+            .slider({
+                min: 1,
+                max: 2,
+                ticks: [1, 2],
+                ticks_labels: ["Timer", "Manual"],
+                step: 1,
+                tooltip: "hide"
+            })
+            .on("change", function(e) {
+            	stopLoad();
+                if (e.value.newValue == 1) {
+                    $.get("/do/set/fairyMode/0");
+                    $(fairyStateSlider.slider('getElement')).css("display", "none");
+                } else {
+                    $.get("/do/set/fairyMode/2");
+                    $(fairyStateSlider.slider('getElement')).css("display", "inline-block");
+                    $(fairyStateSlider.slider('getElement')).css("margin-bottom", "24px");
+                }
+				startLoad();
+            });
+
+        // Handle manual fairy lights state toggle element
+        var fairyStateSlider = $('#fairyStateSlider')
+            .slider({
+                min: 1,
+                max: 2,
+                ticks: [1, 2],
+                ticks_labels: ["On", "Off"],
+                step: 1,
+                tooltip: "hide"
+            })
+            .on("change", function(e) {
+            	stopLoad();
+                if (e.value.newValue == 1) {
+                    $.get("/do/set/fairyState/True");
+                    $('body').addClass("flon");
+                } else {
+                    $.get("/do/set/fairyState/False");
+                    $('body').removeClass("flon");
+                }
+                startLoad();
+            });
+
+        // Get current state from Pi
+        function load() {
+            $.getJSON("/do/get", function(data) {
+                // Set tapeMode toggle to current tapeMode, show/hide colour picker
+                if (data.tapeMode == 0) {
+                    tapeSlider.slider('setValue', 1);
+                    $("#tapePicker+div").css("display", "none");
+                }
+
+                if (data.tapeMode == 1) {
+                    tapeSlider.slider('setValue', 2);
+                    $("#tapePicker+div").css("display", "none");
+                }
+
+                if (data.tapeMode == 2) {
+                    tapeSlider.slider('setValue', 3);
+                    $("#tapePicker+div").css("display", "inline-block");
+                }
+
+                // Set background colour
+                var newr = map(data.tapeColour[0], 0, 100, 0, 255);
+                var newg = map(data.tapeColour[1], 0, 100, 0, 255);
+                var newb = map(data.tapeColour[2], 0, 100, 0, 255);
+                $('body').css("background-color", "rgb(" + newr + "," + newg + "," + newb + ")");
+
+                // Set manual fairy lights toggle to current state, add flon class to body, which shows fairy lights gif
+                if (data.fairyState) {
+                    fairyStateSlider.slider('setValue', 1);
+                    $('body').addClass("flon");
+                } else {
+                    fairyStateSlider.slider('setValue', 2);
+                    $('body').removeClass("flon");
+                }
+
+                // Set fairyMode toggle to current fairyMode
+                if (data.fairyMode == 0) {
+                    fairySlider.slider('setValue', 1);
+                    $(fairyStateSlider.slider('getElement')).css("display", "none");
+                }
+
+                if (data.fairyMode == 2) {
+                    fairySlider.slider('setValue', 2);
+                    $(fairyStateSlider.slider('getElement')).css("display", "inline-block");
+                }
+
+                // Set colour picker to current colour, but only if it hasn't been changed by the user
+                if ($("#tapePicker").spectrum("get").toRgb().r == oldr && $("#tapePicker").spectrum("get").toRgb().g == oldg && $("#tapePicker").spectrum("get").toRgb().b == oldb) {
+                    $('#tapePicker').spectrum("set", "rgb(" + newr + "," + newg + "," + newb + ")");
+                    // Save colour for next run
+                	oldr = newr;
+                	oldg = newg;
+                	oldb = newb;
+                }
+            });
+        }
+
+        // Initialise interval of load() function
+        document.addEventListener("ready", load());
+        document.addEventListener("ready", startLoad());
+
+        // Handle display of extra controls
+        $('#opencontrols').click(function() {
+            $('#controls').modal('show');
+        });
+
+    </script>
+</body>
+
+</html>
