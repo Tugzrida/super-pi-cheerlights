@@ -125,25 +125,12 @@ The server built into bottle is designed for development only and is therefore n
 
 Start by stopping super-pi-cheerlights to free up port 80 (`sudo systemctl stop super-pi-cheerlights`) then install nginx with `sudo apt-get -y install nginx`
 
-Now remove the existing `root` directive and add the following lines to `/etc/nginx/sites-enabled/default` inside the `server` block (you'll need root access):
-```
-root /home/pi/super-pi-cheerlights/www;
+Now, remove the `default` site with `sudo rm /etc/nginx/sites-enabled/default`
 
-location /static/ {
-    alias /home/pi/super-pi-cheerlights/www/;
-    # First attempt to serve request as file, then
-    # as directory, then fall back to displaying a 404.
-    try_files $uri $uri/ =404;
-}
-
-location /do/get {
-    alias /home/pi/super-pi-cheerlights/www/get.json;
-    default_type application/json;
-}
-
-location /do/ {
-    proxy_pass http://127.0.0.1:8080/do/;
-}
+Then install the `super-pi-cheerlights` site:
+```bash
+sudo cp /home/pi/super-pi-cheerlights/super-pi-cheerlights.nginx.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/super-pi-cheerlights.nginx.conf /etc/nginx/sites-enabled/
 ```
 You can verify your changes with `sudo nginx -t`
 
