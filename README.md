@@ -13,13 +13,13 @@ Both of these features are optional and their relevant controls can be hidden (s
 A quick rundown of what will happen once you've completed this setup:
 
 * `super-pi-cheerlights.py` will start in the background at boot and takes care of the bulk of the operation. By default, the web UI is fully served from within this file, accessible on port 80(the standard HTTP port) of the Pi.
-* `getsun.py` will run at least once a day to load in the current sunset times from the [sunrise-sunset.org](https://sunrise-sunset.org/) API. Success of `getsun.py` symbolised by two green flashes of the LED tape.
+* `getsun.py` will run after the lights have turned off for the night to load in the sunset times for the next day from the [sunrise-sunset.org](https://sunrise-sunset.org/) API. Success of `getsun.py` is symbolised by two green flashes of the LED tape.
 
 The sunset timer fades up the brightness of the LED strips between sunset (when the sun passes below the horizon) and the end of civil twilight (when the center of the sun is more than 6&deg; below the horizon), by which time it is fairly dark. Also at the end of civil twilight, the fairy lights are turned on via a PowerSwitch tail.
 
 At the equator there's approximately 20 mins between sunset and the end of civil twilight. Where I live in Sydney, Australia, there's usually between 25-30 minutes difference. The further you go from the equator, the greater this time.
 
-For those who live greater than around 60&deg; North or South of the equator, you're probably aware that you don't always have the luxury of sunset or twilight, depending on the time of year. If there's no sunset or twilight defined for your location, it'll default to the Unix epoch of 1970 - not particularly useful. As a work around I suggest either changing the latitude in `getsun.py` to be within -60 and 60 or using the [manual time option detailed below](#settings).
+For those who live greater than around 60&deg; North or South of the equator, you're probably aware that you don't always technically have a sunset or twilight, depending on the time of year. If there's no sunset or twilight defined for your location, it'll default to the Unix epoch of 1970 - not particularly useful. As a work around I suggest either changing the latitude in `getsun.py` to be within -60 and 60 or using the [manual start options in `getsun.py`](#sun-times-schedule-setup).
 
 * [Software](#software)
   * [Install](#install)
@@ -39,7 +39,10 @@ For those who live greater than around 60&deg; North or South of the equator, yo
 
 ## Install
 ```bash
-curl -fsSL https://github.com/Tugzrida/super-pi-cheerlights/raw/master/install.sh | bash
+curl -fsSL https://github.com/Tugzrida/super-pi-cheerlights/raw/master/install.sh > /tmp/super-pi-cheerlights-install;
+echo "140174f1a965933fbb2c05254a11cc2b7640f257  /tmp/super-pi-cheerlights-install" | sha1sum -c - && bash /tmp/super-pi-cheerlights-install;
+
+
 ```
 (as always ***please*** read the contents of one-liner install scripts before running them as ***they have full access to your entire system***)
 
@@ -55,13 +58,9 @@ The options in `getsun.py` need to be set or your setup will not work:
 * `manualstart`: If you don't want the system to use the sun times(or live somewhere that doesn't have sunset and twilight), set this to True and specify the times you wish to use for sunset and twilight in the following options, in the same way as the off time.
 * `mansunset*`, `mantwilight*`: same as `off*` for the respective timepoints. Only applies if you set manualstart to True
 
-Run `crontab -e` and add the following line to the end:
-```
-0 11-13 * * * /home/pi/super-pi-cheerlights/getsun.py
-```
-This runs `getsun.py` at 11am, 12pm and 1pm everyday for redundancy in case of an internet or power outage. If the Pi misses all three, you can easily run `getsun.py` manually from the web UI or CLI.
+After you've set these, run `/home/pi/super-pi-cheerlights/getsun.py` to initially create `sunset.json`
 
-Now run `/home/pi/super-pi-cheerlights/getsun.py` to initially create `sunset.json`
+After this, `sunset.json` will be automatically updated - starting from one hour after the lights turn off, `getsun.py` will be run once an hour until the times refresh successfully. If you have this installed publicly, you might want to comment out lines 324-336 so the 'success' flashes don't go during this time.
 
 ### Start on boot
 The main file, `super-pi-cheerlights.py`, can be started on boot with systemd.
