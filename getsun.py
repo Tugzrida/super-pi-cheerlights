@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # super-pi-cheerlights: getsun.py: runs daily to save sunset times to sunset.json
-# Copyright (C) 2017 Tugzrida (github.com/Tugzrida)
+# Copyright (C) 2018 Tugzrida (github.com/Tugzrida)
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -21,10 +21,9 @@
 # API. Take note that if this script is run while the
 # lights are on, but after midnight, the lights will
 # switch off as sunset.json will be updated for the new
-# day. I recommend just running this on a cronjob at 12 noon
-# every day. Something like 0 11-13 * * * /home/pi/super-pi-cheerlights/getsun.py
-# which runs this at 11am, 12pm and 1pm everyday for redundancy
-# in case of an internet or power outage should do fine.
+# day. The main file will only run this script automatically
+# after the lights have gone off for the night, however running
+# this script directly or using the web UI will work at any time.
 
 from os import path
 from json import dumps

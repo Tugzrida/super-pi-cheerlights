@@ -2,7 +2,7 @@
 
 # super-pi-cheerlights: super-pi-cheerlights.py: runs as a daemon acting as a sunset timer and
 #                                                remote control for LED Tape and other lights.
-# Copyright (C) 2017 Tugzrida (github.com/Tugzrida)
+# Copyright (C) 2018 Tugzrida (github.com/Tugzrida)
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -31,10 +31,12 @@ from requests import get
 
 # Variables
 redVal = grnVal = bluVal = prevR = prevG = prevB = tapeMode = fairyMode = jsonMod = 0
+lastLoadAttempt = parse("2017-01-01T00:00:00+00:00")
 # red/grn/bluVal - keeps track of current value during crossfade
 # prevR/G/B - keeps track of last set colour for crossfade
 # tape/fairyMode - see below
 # jsonMod - keeps track of sunset.json modification time to detect changes
+# lastLoadAttempt - keeps track of when getsun.py was last automatically run to prevent overloading
 
 tapeColour = [0, 0, 0] # keeps track of currently set tape colour for web ui
 fairyState = tapeLock = False
@@ -335,6 +337,11 @@ while True:
         tapeLock = False
     
     now = datetime.now(timezone(timeZone))
+    
+    # Reload sunset.json if necessary
+    if (now > off+timedelta(hours=1)) and (now > lastLoadAttempt+timedelta(hours=1)):
+        start_new_thread(system, (path.join(path.dirname(path.abspath(__file__)), 'getsun.py'), ))
+        lastLoadAttempt = now
     
     # True if lights should run in full automatic mode
     tapeRun = (tapeMode == 0 and now >= sunset and now <= off)
